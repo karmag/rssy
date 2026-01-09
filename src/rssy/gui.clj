@@ -193,14 +193,19 @@
                            [item-listing "grow"]])))
 
 (defn- make-manage-panel []
-  (let [channel-buttons (mig/mig-panel
-                         :constraints ["fill, insets 0" "[grow 0|grow 0|grow 0|grow|grow 0]"]
+  (let [general-buttons (mig/mig-panel
+                         :constraints ["" "[grow 0|grow 0|grow]"]
+                         :items [[(ss/button :text "Refresh all" :id :channels|refresh-all)]
+                                 [(ss/button :text "Delete items" :id :channels|delete-items)]
+                                 [:fill-h "grow"]])
+
+        channel-buttons (mig/mig-panel
+                         :constraints ["fill, insets 0" "[grow 0|grow 0|grow 0|grow]"]
                          :items [[(ss/text :id :channels|text) "grow, span, wrap"]
                                  [(ss/button :text "Add" :id :channels|add)]
                                  [(ss/button :text "Remove" :id :channels|remove)]
                                  [(ss/button :text "Refresh" :id :channels|refresh)]
-                                 [:fill-h "grow"]
-                                 [(ss/button :text "Refresh all" :id :channels|refresh-all)]])
+                                 [:fill-h "grow"]])
 
         channel-table (ss/scrollable
                        (make-table :channels|table
@@ -210,9 +215,13 @@
 
         channels (mig/mig-panel
                   :constraints ["fill" "" "[grow 0|grow]"]
-                  :items [[channel-buttons "grow, wrap"]
-                          [channel-table "grow"]]
-                  :border "Channels")
+                  :items [[general-buttons "grow, wrap"]
+                          [(mig/mig-panel
+                            :constraints ["fill" "" "[grow 0|grow]"]
+                            :items [[channel-buttons "grow, wrap"]
+                                    [channel-table "grow"]]
+                            :border "Channels")
+                           "grow"]])
 
         group-buttons (mig/mig-panel
                        :constraints ["fill, insets 0" "[grow 0|grow 0|grow]"]
@@ -411,6 +420,9 @@
                (fn [_]
                  (future
                    (control/refresh-channels (:control state)))))
+    (ss_listen (:channels|delete-items state) :action
+               (fn [_]
+                 (control/delete-items (:control state))))
     (ss_listen (.getDocument (:channels|text state)) :document
                (fn [_]
                  (non-blocking-solo

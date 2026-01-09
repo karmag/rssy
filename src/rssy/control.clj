@@ -192,6 +192,11 @@
      (event-items-changed control)
      item)))
 
+(defn delete-items [control]
+  (database/delete-items (::db control))
+  (log control {:level :info :msg "Deleted items"})
+  (event-items-changed control))
+
 (defn add-group [control group-name]
   (database/add-group (::db control) {:name group-name})
   (event-groups-changed control)

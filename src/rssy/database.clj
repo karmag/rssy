@@ -117,6 +117,9 @@
       (jdbc/update! db :item new ["id=?" (:id item)])
       new)))
 
+(defn delete-items [db]
+  (jdbc/execute! db ["DELETE FROM item"]))
+
 (defn- get-group-id [db group]
   (-> (jdbc/query db ["SELECT id FROM usergroup WHERE name=?" (:name group)])
       first
