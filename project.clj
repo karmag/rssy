@@ -11,7 +11,7 @@
 
                  ;; logging
                  [com.taoensso/telemere "1.1.0"]]
-  :profiles {:uberjar {:aot [#".*"]}}
+  :profiles {:uberjar {:aot :all}}
   :jvm-opts ["-Dswing.plaf.metal.controlFont=Arial-18"]
   :repl-options {:init-ns rssy.core}
   :main rssy.core)

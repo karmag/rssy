@@ -3,7 +3,10 @@
   (:import java.text.ParseException
            java.text.SimpleDateFormat
            java.util.Date
-           java.util.Locale))
+           java.util.Locale)
+  (:import java.util.concurrent.locks.ReentrantLock))
+
+(def ^:private sdf-guard (ReentrantLock.))
 
 (def ^:private rfc-822-datetime (SimpleDateFormat. "EEE, dd MMM yyyy HH:mm:ss z" Locale/ENGLISH))
 (def ^:private iso-8601-datetime (SimpleDateFormat. "yyyy-MM-dd'T'HH:mm:ssX"))
@@ -17,15 +20,18 @@
   Return nil if the time can not be parsed."
   [time-text]
   (when time-text
-    (or (try (let [date (.parse rfc-822-datetime time-text)]
-               (long (/ (.getTime date) 1000)))
-             (catch ParseException _))
-        (try (let [date (.parse iso-8601-datetime time-text)]
-               (long (/ (.getTime date) 1000)))
-             (catch ParseException _))
-        (try (let [date (.parse simple-date time-text)]
-               (long (/ (.getTime date) 1000)))
-             (catch ParseException _)))))
+    (.lock sdf-guard)
+    (try (or (try (let [date (.parse rfc-822-datetime time-text)]
+                    (long (/ (.getTime date) 1000)))
+                  (catch ParseException _))
+             (try (let [date (.parse iso-8601-datetime time-text)]
+                    (long (/ (.getTime date) 1000)))
+                  (catch ParseException _))
+             (try (let [date (.parse simple-date time-text)]
+                    (long (/ (.getTime date) 1000)))
+                  (catch ParseException _)))
+         (finally
+           (.unlock sdf-guard)))))
 
 (defn format-time [milliseconds]
   (.format human-readable-time (Date. (long milliseconds))))

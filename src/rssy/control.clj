@@ -3,7 +3,8 @@
   (:require [rssy.database :as database]
             [rssy.parser.parser :as parser]
             [rssy.net :as net]
-            [taoensso.telemere :as tel]))
+            [taoensso.telemere :as tel])
+  (:import java.util.concurrent.locks.ReentrantLock))
 
 (defn- event-channels-changed [control]
   (dosync
@@ -143,34 +144,42 @@
                         (format "Refreshing %s" (-> channels first :link))
                         (format "Refreshing %d channels" (count channels))))
 
-   (let [error-counter (atom 0)]
-     (doseq [[index ch] (map-indexed vector channels)]
-       (try (let [link (:link ch)
-                  http-response (run-check {:message "Download failed"
-                                            :link link}
-                                           (net/get-uri link :xml))
-                  new-channel (run-check {:message "Parsing failed"
-                                          :link link
-                                          :body (:body http-response)}
-                                         (parser/parse-xml (:body http-response)
-                                                           link))]
-              (run-check {:message "Database failed"
-                          :link link
-                          :data new-channel}
-                         (database/add-channel (::db control) new-channel))
-              (log control :info (format "[%d/%d] OK %s"
-                                         (inc index)
-                                         (count channels)
-                                         (:link ch))))
-            (catch Exception e
-              (swap! error-counter inc)
-              (log control {:level :error
-                            :msg (format "[%d/%d] FAILED %s"
-                                         (inc index)
-                                         (count channels)
-                                         (:link ch))
-                            :data ch
-                            :error e}))))
+   (let [refresh-counter (atom 0)
+         error-counter (atom 0)
+         lock (ReentrantLock.)
+         f (fn [ch]
+             (future
+               (try (let [link (:link ch)
+                          http-response (run-check {:message "Download failed"
+                                                    :link link}
+                                                   (net/get-uri link :xml))
+                          new-channel (run-check {:message "Parsing failed"
+                                                  :link link
+                                                  :body (:body http-response)}
+                                                 (parser/parse-xml (:body http-response)
+                                                                   link))]
+                      (run-check {:message "Database failed"
+                                  :link link
+                                  :data new-channel}
+                                 (try (.lock lock)
+                                      (database/add-channel (::db control) new-channel)
+                                      (finally
+                                        (.unlock lock))))
+                      (log control :info (format "[%d/%d] OK %s"
+                                                 (swap! refresh-counter inc)
+                                                 (count channels)
+                                                 (:link ch))))
+                    (catch Exception e
+                      (swap! error-counter inc)
+                      (log control {:level :error
+                                    :msg (format "[%d/%d] FAILED %s"
+                                                 (swap! refresh-counter inc)
+                                                 (count channels)
+                                                 (:link ch))
+                                    :data ch
+                                    :error e})))))]
+
+     (doseq [f (doall (map f channels))] @f)
 
      (log control :info (format "Refreshed %d channels (%d failed)"
                                 (count channels)
