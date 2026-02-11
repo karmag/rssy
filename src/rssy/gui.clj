@@ -285,11 +285,13 @@
 
 (defn- make-frame []
   (let [top (mig/mig-panel
-             :constraints ["fill, insets n n 0 n" "[grow 0][grow 0][grow 0]20[grow 0][grow]"]
-             :items [[(ss/button :text "View" :id :tab|view)]
-                     [(ss/button :text "Manage" :id :tab|manage)]
-                     [(ss/button :text "Log" :id :tab|log)]
-                     [(ss/label :text "..." :id :log|quick) "grow"]])]
+             :constraints ["fill" "[grow 0]20[grow]"]
+             :items [[(ss/tabbed-panel :id :tab|tabs
+                                       :placement :top
+                                       :tabs [{:title "View"}
+                                              {:title "Manage"}
+                                              {:title "Log"}])]
+                     [(ss/label :text "Log message goes here" :id :log|quick) "grow"]])]
     (ss/frame :title "rssy"
               :on-close :exit
               :minimum-size [800 :by 600]
@@ -305,15 +307,13 @@
 ;; listeners
 
 (defn- setup-tab-selection [state]
-  (let [set-active (fn [button panel]
-                     (ss/show-card! (:tab|panel state) panel)
-                     (ss/config! ((juxt :tab|view :tab|manage :tab|log) state)
-                                 :enabled? true)
-                     (ss/config! (button state) :enabled? false))]
-    (set-active :tab|view :view)
-    (ss_listen (:tab|view state) :action (fn [_] (set-active :tab|view :view)))
-    (ss_listen (:tab|manage state) :action (fn [_] (set-active :tab|manage :manage)))
-    (ss_listen (:tab|log state) :action (fn [_] (set-active :tab|log :log)))))
+  (ss_listen (:tab|tabs state) :selection
+             (fn [_]
+               (let [panel (get {0 :view
+                                 1 :manage
+                                 2 :log}
+                                (:index (ss/selection (:tab|tabs state))))]
+                 (ss/show-card! (:tab|panel state) panel)))))
 
 (defn- setup-view-selection [state]
   (ss_listen (:view|tabbed-panel state) :selection
